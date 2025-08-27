@@ -32,6 +32,18 @@ echo -e "${YELLOW}📋 Checking dependencies...${NC}"
 command -v docker >/dev/null 2>&1 || { echo -e "${RED}❌ Docker is required but not installed.${NC}" >&2; exit 1; }
 command -v docker-compose >/dev/null 2>&1 || { echo -e "${RED}❌ Docker Compose is required but not installed.${NC}" >&2; exit 1; }
 
+# Check available memory
+TOTAL_MEM=$(free -m | awk 'NR==2{printf "%.0f", $2}')
+echo -e "${YELLOW}💾 Available memory: ${TOTAL_MEM}MB${NC}"
+if [ "$TOTAL_MEM" -lt 900 ]; then
+    echo -e "${RED}⚠️  Warning: Less than 1GB RAM detected. Performance may be limited.${NC}"
+    echo -e "${YELLOW}💡 Consider adding swap space or upgrading RAM.${NC}"
+    read -p "Continue anyway? [y/N]: " CONTINUE_LOW_MEM
+    if [[ ! $CONTINUE_LOW_MEM =~ ^[Yy]$ ]]; then
+        exit 1
+    fi
+fi
+
 # Check if npm_default network exists (from n8n setup)
 if ! docker network ls | grep -q npm_default; then
     echo -e "${RED}❌ npm_default network not found. Is your n8n/Nginx Proxy Manager running?${NC}"
@@ -55,7 +67,8 @@ if [ ! -f .env ]; then
     echo -e "${YELLOW}⚙️  Creating environment configuration...${NC}"
     
     # Get user inputs
-    read -p "Enter your Nextcloud domain (e.g., next.example.com): " DOMAIN
+    read -p "Enter your Nextcloud domain [next.example.com]: " DOMAIN
+    DOMAIN=${DOMAIN:-next.example.com}
     read -p "Enter Nextcloud admin username [admin]: " ADMIN_USER
     ADMIN_USER=${ADMIN_USER:-admin}
     
@@ -138,9 +151,12 @@ if docker-compose ps | grep -q "Up"; then
     echo "2. 🔧 Advanced settings in Nginx Proxy Manager:"
     echo "   Add this to the 'Advanced' tab:"
     echo ""
-    echo "   client_max_body_size 10G;"
+    echo "   client_max_body_size 1G;"
     echo "   proxy_request_buffering off;"
     echo "   proxy_buffering off;"
+    echo "   proxy_read_timeout 3600;"
+    echo "   proxy_connect_timeout 60;"
+    echo "   proxy_send_timeout 600;"
     echo ""
     echo "3. 🌟 Once configured, access via:"
     echo "   https://$NEXTCLOUD_DOMAIN"

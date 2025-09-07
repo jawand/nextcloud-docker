@@ -23,22 +23,57 @@ next.prismantis.com {
         X-Content-Type-Options "nosniff"
     }
 
-    # Handle large file uploads
+    # Handle large file uploads - CRITICAL for Nextcloud
     request_body {
         max_size 1GB
     }
 
-    reverse_proxy localhost:8080 {
-        # Add headers for Nextcloud
+    # Special handling for Nextcloud uploads
+    @uploads {
+        path /remote.php/dav/files/*
+        path /remote.php/webdav/*
+        path /public.php/dav/files/*
+        path /apps/files/*
+    }
+
+    # Handle uploads with specific configuration
+    reverse_proxy @uploads localhost:8080 {
+        # Essential headers for Nextcloud uploads
         header_up X-Forwarded-Proto "https"
         header_up X-Forwarded-For {remote_host}
         header_up Host {host}
         header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Host {host}
         
-        # Increase timeouts for large uploads
+        # Critical: Preserve Content-Length for uploads
+        header_up Content-Length {http.request.header.Content-Length}
+        
+        # Handle chunked uploads
+        flush_interval -1
+        
+        # Extended timeouts for large uploads
         transport http {
             read_timeout 3600s
             write_timeout 3600s
+            dial_timeout 30s
+            response_header_timeout 30s
+            expect_continue_timeout 10s
+        }
+    }
+
+    # Handle all other requests
+    reverse_proxy localhost:8080 {
+        # Standard headers
+        header_up X-Forwarded-Proto "https"
+        header_up X-Forwarded-For {remote_host}
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-Host {host}
+        
+        # Standard timeouts
+        transport http {
+            read_timeout 300s
+            write_timeout 300s
         }
     }
 }

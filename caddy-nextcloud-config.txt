@@ -1,7 +1,7 @@
 # Add this to your existing /etc/caddy/Caddyfile
-# Replace next.example.com with your actual domain
+# Configuration for next.prismantis.com
 
-next.example.com {
+next.prismantis.com {
     # Add debug logging
     log {
         output stderr

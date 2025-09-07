@@ -13,8 +13,18 @@ BLUE='\033[0;34m'
 NC='\033[0m' # No Color
 
 echo -e "${GREEN}🚀 Nextcloud Docker Deployment Script${NC}"
-echo -e "${BLUE}   (Compatible with existing Nginx Proxy Manager)${NC}"
+echo -e "${BLUE}   (Compatible with Caddy reverse proxy)${NC}"
 echo "=================================================="
+
+# Check if required files exist in current directory
+REQUIRED_FILES=("docker-compose.yml" "nextcloud-custom.ini" "caddy-nextcloud-config.txt")
+for file in "${REQUIRED_FILES[@]}"; do
+    if [ ! -f "$file" ]; then
+        echo -e "${RED}❌ Required file '$file' not found in current directory${NC}"
+        echo -e "${YELLOW}💡 Please run this script from the nextcloud-docker directory${NC}"
+        exit 1
+    fi
+done
 
 # Check if running as root
 if [[ $EUID -eq 0 ]]; then
@@ -60,10 +70,20 @@ if netstat -tuln | grep -q ":8080 "; then
     exit 1
 fi
 
+# Get the directory where this script is located
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+
 # Create project directory
 PROJECT_DIR="$HOME/nextcloud"
 echo -e "${YELLOW}📁 Creating project directory: $PROJECT_DIR${NC}"
 mkdir -p "$PROJECT_DIR"
+
+# Copy necessary files to project directory
+echo -e "${YELLOW}📋 Copying configuration files...${NC}"
+cp "$SCRIPT_DIR/docker-compose.yml" "$PROJECT_DIR/" || { echo -e "${RED}❌ docker-compose.yml not found in script directory${NC}"; exit 1; }
+cp "$SCRIPT_DIR/nextcloud-custom.ini" "$PROJECT_DIR/" || { echo -e "${RED}❌ nextcloud-custom.ini not found in script directory${NC}"; exit 1; }
+cp "$SCRIPT_DIR/caddy-nextcloud-config.txt" "$PROJECT_DIR/" || { echo -e "${RED}❌ caddy-nextcloud-config.txt not found in script directory${NC}"; exit 1; }
+
 cd "$PROJECT_DIR"
 
 # Create subdirectories

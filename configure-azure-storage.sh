@@ -70,17 +70,42 @@ docker exec nextcloud-app php occ app:enable files_external
 # Install Azure Blob Storage support
 echo -e "${YELLOW}� Confilguring Azure Blob Storage as S3-compatible storage...${NC}"
 
+# Check available authentication backends for amazons3
+echo -e "${YELLOW}🔍 Checking available authentication backends...${NC}"
+docker exec nextcloud-app php occ files_external:backends storage amazons3
+
 # Create S3-compatible external storage mount for Azure Blob
-docker exec nextcloud-app php occ files_external:create \
+echo -e "${YELLOW}🔧 Creating external storage mount...${NC}"
+if docker exec nextcloud-app php occ files_external:create \
     "$MOUNT_NAME" \
     "amazons3" \
-    "password::password"
+    "amazons3::accesskey"; then
+    echo -e "${GREEN}✅ External storage mount created successfully${NC}"
+else
+    echo -e "${RED}❌ Failed to create external storage mount${NC}"
+    echo -e "${YELLOW}💡 Trying alternative authentication backend...${NC}"
+    
+    # Try with different auth backend
+    if docker exec nextcloud-app php occ files_external:create \
+        "$MOUNT_NAME" \
+        "amazons3" \
+        "amazons3::key"; then
+        echo -e "${GREEN}✅ External storage mount created with alternative backend${NC}"
+    else
+        echo -e "${RED}❌ Failed with all authentication backends${NC}"
+        echo -e "${YELLOW}💡 Available backends for amazons3:${NC}"
+        docker exec nextcloud-app php occ files_external:backends storage amazons3
+        exit 1
+    fi
+fi
 
 # Get the mount ID (usually 1 for first external storage)
 MOUNT_ID=$(docker exec nextcloud-app php occ files_external:list | grep "$MOUNT_NAME" | awk '{print $2}' | tr -d '|' | xargs)
 
 if [ -z "$MOUNT_ID" ]; then
-    echo -e "${RED}❌ Failed to create external storage mount${NC}"
+    echo -e "${RED}❌ Failed to get mount ID${NC}"
+    echo -e "${YELLOW}💡 Current external storage list:${NC}"
+    docker exec nextcloud-app php occ files_external:list
     exit 1
 fi
 

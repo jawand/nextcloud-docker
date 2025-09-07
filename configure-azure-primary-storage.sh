@@ -75,7 +75,9 @@ docker exec nextcloud-app php occ maintenance:mode --on
 
 # Backup current config.php
 echo -e "${YELLOW}💾 Backing up current config.php...${NC}"
-docker exec nextcloud-app cp /var/www/html/config/config.php /var/www/html/config/config.php.backup.$(date +%Y%m%d_%H%M%S)
+BACKUP_TIMESTAMP=$(date +%Y%m%d_%H%M%S)
+docker exec nextcloud-app cp /var/www/html/config/config.php /var/www/html/config/config.php.backup.$BACKUP_TIMESTAMP
+echo -e "${GREEN}✅ Backup created: config.php.backup.$BACKUP_TIMESTAMP${NC}"
 
 # Create the objectstore configuration
 echo -e "${YELLOW}🔧 Configuring Azure Blob as primary storage...${NC}"
@@ -83,35 +85,42 @@ echo -e "${YELLOW}🔧 Configuring Azure Blob as primary storage...${NC}"
 # Create PHP configuration snippet for Azure Blob Storage using PHP itself
 echo -e "${YELLOW}📝 Generating Azure configuration...${NC}"
 
-# Write the configuration using PHP to avoid sed issues with special characters
+# Create the Azure configuration using a safer method
 echo -e "${YELLOW}📝 Writing Azure configuration...${NC}"
-docker exec nextcloud-app php -r "
-\$config = '<?php
+docker exec nextcloud-app bash -c "cat > /tmp/azure_config_snippet.txt << 'AZURE_EOF'
+
 // Azure Blob Storage Primary Storage Configuration
-\$CONFIG[\'objectstore\'] = [
-    \'class\' => \'\\\\OC\\\\Files\\\\ObjectStore\\\\Azure\',
-    \'arguments\' => [
-        \'container\' => \'' . addslashes('$CONTAINER_NAME') . '\',
-        \'account_name\' => \'' . addslashes('$STORAGE_ACCOUNT') . '\',
-        \'account_key\' => \'' . addslashes('$STORAGE_KEY') . '\',
+\$CONFIG['objectstore'] = [
+    'class' => '\\OC\\Files\\ObjectStore\\Azure',
+    'arguments' => [
+        'container' => '$CONTAINER_NAME',
+        'account_name' => '$STORAGE_ACCOUNT',
+        'account_key' => '$STORAGE_KEY',
     ],
 ];
-';
-file_put_contents('/tmp/azure_config.php', \$config);
-"
+AZURE_EOF"
 
 # Append the Azure configuration to config.php
 echo -e "${YELLOW}🔧 Updating config.php...${NC}"
 docker exec nextcloud-app bash -c '
-# Remove the closing ?> tag if it exists
-sed -i "/^?>/d" /var/www/html/config/config.php
+# Create a backup filename with timestamp
+BACKUP_FILE="/var/www/html/config/config.php.backup.$(date +%Y%m%d_%H%M%S)"
+
+# Make sure we have a proper backup
+cp /var/www/html/config/config.php "$BACKUP_FILE"
+echo "Backup created: $BACKUP_FILE"
+
+# Check if config.php ends with ?> and remove it
+if tail -1 /var/www/html/config/config.php | grep -q "?>"; then
+    # Remove the last line if it contains ?>
+    sed -i "$ { /^?>/ d; }" /var/www/html/config/config.php
+fi
 
 # Add the Azure configuration
-echo "" >> /var/www/html/config/config.php
-cat /tmp/azure_config.php >> /var/www/html/config/config.php
+cat /tmp/azure_config_snippet.txt >> /var/www/html/config/config.php
 
 # Clean up temporary file
-rm /tmp/azure_config.php
+rm /tmp/azure_config_snippet.txt
 
 # Ensure proper file permissions
 chown www-data:www-data /var/www/html/config/config.php
@@ -125,7 +134,16 @@ if docker exec nextcloud-app php -l /var/www/html/config/config.php; then
 else
     echo -e "${RED}❌ Configuration syntax error detected${NC}"
     echo -e "${YELLOW}🔄 Restoring backup...${NC}"
-    docker exec nextcloud-app bash -c 'cp /var/www/html/config/config.php.backup.* /var/www/html/config/config.php'
+    
+    # Find the most recent backup and restore it
+    LATEST_BACKUP=$(docker exec nextcloud-app bash -c 'ls -t /var/www/html/config/config.php.backup.* 2>/dev/null | head -1')
+    if [ ! -z "$LATEST_BACKUP" ]; then
+        docker exec nextcloud-app cp "$LATEST_BACKUP" /var/www/html/config/config.php
+        echo -e "${GREEN}✅ Backup restored from: $LATEST_BACKUP${NC}"
+    else
+        echo -e "${RED}❌ No backup found to restore${NC}"
+    fi
+    
     docker exec nextcloud-app php occ maintenance:mode --off
     exit 1
 fi

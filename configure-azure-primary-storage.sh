@@ -80,31 +80,25 @@ docker exec nextcloud-app cp /var/www/html/config/config.php /var/www/html/confi
 # Create the objectstore configuration
 echo -e "${YELLOW}🔧 Configuring Azure Blob as primary storage...${NC}"
 
-# Create PHP configuration snippet for Azure Blob Storage
-AZURE_CONFIG=$(cat << 'EOF'
-<?php
+# Create PHP configuration snippet for Azure Blob Storage using PHP itself
+echo -e "${YELLOW}📝 Generating Azure configuration...${NC}"
+
+# Write the configuration using PHP to avoid sed issues with special characters
+echo -e "${YELLOW}📝 Writing Azure configuration...${NC}"
+docker exec nextcloud-app php -r "
+\$config = '<?php
 // Azure Blob Storage Primary Storage Configuration
-$CONFIG['objectstore'] = [
-    'class' => '\\OC\\Files\\ObjectStore\\Azure',
-    'arguments' => [
-        'container' => 'CONTAINER_NAME_PLACEHOLDER',
-        'account_name' => 'ACCOUNT_NAME_PLACEHOLDER',
-        'account_key' => 'ACCOUNT_KEY_PLACEHOLDER',
+\$CONFIG[\'objectstore\'] = [
+    \'class\' => \'\\\\OC\\\\Files\\\\ObjectStore\\\\Azure\',
+    \'arguments\' => [
+        \'container\' => \'' . addslashes('$CONTAINER_NAME') . '\',
+        \'account_name\' => \'' . addslashes('$STORAGE_ACCOUNT') . '\',
+        \'account_key\' => \'' . addslashes('$STORAGE_KEY') . '\',
     ],
 ];
-EOF
-)
-
-# Replace placeholders with actual values
-AZURE_CONFIG=$(echo "$AZURE_CONFIG" | sed "s/CONTAINER_NAME_PLACEHOLDER/$CONTAINER_NAME/g")
-AZURE_CONFIG=$(echo "$AZURE_CONFIG" | sed "s/ACCOUNT_NAME_PLACEHOLDER/$STORAGE_ACCOUNT/g")
-AZURE_CONFIG=$(echo "$AZURE_CONFIG" | sed "s/ACCOUNT_KEY_PLACEHOLDER/$STORAGE_KEY/g")
-
-# Write the configuration to a temporary file in the container
-echo -e "${YELLOW}📝 Writing Azure configuration...${NC}"
-docker exec nextcloud-app bash -c "cat > /tmp/azure_config.php << 'EOF'
-$AZURE_CONFIG
-EOF"
+';
+file_put_contents('/tmp/azure_config.php', \$config);
+"
 
 # Append the Azure configuration to config.php
 echo -e "${YELLOW}🔧 Updating config.php...${NC}"

@@ -55,17 +55,6 @@ if [[ ! $CONFIRM =~ ^[Yy]$ ]]; then
     exit 0
 fi
 
-# Test Azure Blob Storage connectivity
-echo -e "${YELLOW}🔍 Testing Azure Blob Storage connectivity...${NC}"
-AZURE_ENDPOINT="https://$STORAGE_ACCOUNT.blob.core.windows.net"
-if curl -s --head "$AZURE_ENDPOINT" | head -n 1 | grep -q "200 OK\|400 Bad Request"; then
-    echo -e "${GREEN}✅ Azure Storage endpoint is reachable${NC}"
-else
-    echo -e "${RED}❌ Cannot reach Azure Storage endpoint: $AZURE_ENDPOINT${NC}"
-    echo -e "${YELLOW}💡 Please check your storage account name and network connectivity${NC}"
-    exit 1
-fi
-
 # Check if Nextcloud is running
 if ! docker ps | grep -q nextcloud-app; then
     echo -e "${RED}❌ Nextcloud container is not running${NC}"
@@ -115,16 +104,50 @@ echo -e "${YELLOW}🔍 Verifying Azure Blob Storage mount...${NC}"
 if docker exec nextcloud-app php occ files_external:verify "$MOUNT_ID"; then
     echo -e "${GREEN}✅ Azure Blob Storage mount verified successfully!${NC}"
 else
-    echo -e "${RED}❌ Mount verification failed. Please check your credentials.${NC}"
-    echo -e "${YELLOW}💡 Common issues:${NC}"
-    echo "- Incorrect storage account name or key"
-    echo "- Container doesn't exist or is not accessible"
-    echo "- Network connectivity issues"
+    echo -e "${RED}❌ Mount verification failed. Please check your configuration.${NC}"
     echo ""
-    echo -e "${YELLOW}🔧 To troubleshoot:${NC}"
-    echo "1. Verify credentials in Azure Portal"
-    echo "2. Check container exists and has proper permissions"
-    echo "3. Test connectivity: curl -I https://$STORAGE_ACCOUNT.blob.core.windows.net"
+    echo -e "${YELLOW}🔧 Troubleshooting Steps:${NC}"
+    echo ""
+    echo -e "${BLUE}1. Verify Azure Storage Account Details:${NC}"
+    echo "   - Storage Account: $STORAGE_ACCOUNT"
+    echo "   - Container: $CONTAINER_NAME"
+    echo "   - Check these exist in Azure Portal"
+    echo ""
+    echo -e "${BLUE}2. Verify Access Key:${NC}"
+    echo "   - Go to Azure Portal → Storage Account → Access Keys"
+    echo "   - Copy key1 or key2 (not connection string)"
+    echo "   - Ensure no extra spaces or characters"
+    echo ""
+    echo -e "${BLUE}3. Check Container Permissions:${NC}"
+    echo "   - Container should be 'Private' (not public)"
+    echo "   - Ensure container exists and is accessible"
+    echo ""
+    echo -e "${BLUE}4. Test Manual Connection:${NC}"
+    echo "   curl -I https://$STORAGE_ACCOUNT.blob.core.windows.net"
+    echo ""
+    echo -e "${BLUE}5. Check Network/Firewall:${NC}"
+    echo "   - Azure Storage firewall settings"
+    echo "   - Server outbound connectivity on port 443"
+    echo ""
+    read -p "Would you like to try manual web configuration instead? [y/N]: " TRY_MANUAL
+    if [[ $TRY_MANUAL =~ ^[Yy]$ ]]; then
+        echo ""
+        echo -e "${YELLOW}📋 Manual Configuration Instructions:${NC}"
+        echo "1. Login to Nextcloud as admin"
+        echo "2. Go to Settings → Apps → Enable 'External storage support'"
+        echo "3. Go to Settings → Administration → External Storage"
+        echo "4. Add new storage with these settings:"
+        echo "   - Type: Amazon S3"
+        echo "   - Folder name: $MOUNT_NAME"
+        echo "   - Bucket: $CONTAINER_NAME"
+        echo "   - Hostname: $STORAGE_ACCOUNT.blob.core.windows.net"
+        echo "   - Port: 443"
+        echo "   - Enable SSL: Yes"
+        echo "   - Enable Path Style: Yes"
+        echo "   - Access Key: $STORAGE_ACCOUNT"
+        echo "   - Secret Key: [your storage key]"
+        echo "5. Click the checkmark to test connection"
+    fi
     exit 1
 fi
 

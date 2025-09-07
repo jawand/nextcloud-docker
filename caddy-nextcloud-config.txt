@@ -1,0 +1,44 @@
+# Add this to your existing /etc/caddy/Caddyfile
+# Replace next.example.com with your actual domain
+
+next.example.com {
+    # Add debug logging
+    log {
+        output stderr
+        format console
+        level INFO
+    }
+    
+    # Add security headers
+    header {
+        # Enable HSTS
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        # Disable FLoC tracking
+        Permissions-Policy "interest-cohort=()"
+        # XSS protection
+        X-XSS-Protection "1; mode=block"
+        # Prevent clickjacking
+        X-Frame-Options "SAMEORIGIN"
+        # Disable MIME type sniffing
+        X-Content-Type-Options "nosniff"
+    }
+
+    # Handle large file uploads
+    request_body {
+        max_size 1GB
+    }
+
+    reverse_proxy localhost:8080 {
+        # Add headers for Nextcloud
+        header_up X-Forwarded-Proto "https"
+        header_up X-Forwarded-For {remote_host}
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        
+        # Increase timeouts for large uploads
+        transport http {
+            read_timeout 3600s
+            write_timeout 3600s
+        }
+    }
+}

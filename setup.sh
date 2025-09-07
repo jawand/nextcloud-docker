@@ -44,14 +44,21 @@ if [ "$TOTAL_MEM" -lt 900 ]; then
     fi
 fi
 
-# Check if npm_default network exists (from n8n setup)
-if ! docker network ls | grep -q npm_default; then
-    echo -e "${RED}❌ npm_default network not found. Is your n8n/Nginx Proxy Manager running?${NC}"
+# Check if Caddy is running (from n8n setup)
+if ! systemctl is-active --quiet caddy; then
+    echo -e "${RED}❌ Caddy is not running. Is your n8n setup configured?${NC}"
     echo -e "${YELLOW}💡 Make sure your n8n setup is running first.${NC}"
     exit 1
 fi
 
-echo -e "${GREEN}✅ Found existing npm_default network${NC}"
+echo -e "${GREEN}✅ Found Caddy running${NC}"
+
+# Check if port 8080 is available
+if netstat -tuln | grep -q ":8080 "; then
+    echo -e "${RED}❌ Port 8080 is already in use${NC}"
+    echo -e "${YELLOW}💡 Please free up port 8080 or modify docker-compose.yml${NC}"
+    exit 1
+fi
 
 # Create project directory
 PROJECT_DIR="$HOME/nextcloud"
@@ -141,22 +148,14 @@ if docker-compose ps | grep -q "Up"; then
     echo -e "${GREEN}🎉 Nextcloud deployment completed successfully!${NC}"
     echo ""
     echo -e "${BLUE}📋 Next Steps:${NC}"
-    echo "1. 🌐 Add a new proxy host in your Nginx Proxy Manager:"
-    echo "   - Domain: $NEXTCLOUD_DOMAIN"
-    echo "   - Forward to: nextcloud-app:80"
-    echo "   - Enable 'Block Common Exploits'"
-    echo "   - Enable 'Websockets Support'"
-    echo "   - Get SSL certificate (Let's Encrypt)"
+    echo "1. 🌐 Configure Caddy for Nextcloud:"
+    echo "   - Copy configuration from 'caddy-nextcloud-config.txt'"
+    echo "   - Add it to your /etc/caddy/Caddyfile"
+    echo "   - Update domain name to: $NEXTCLOUD_DOMAIN"
     echo ""
-    echo "2. 🔧 Advanced settings in Nginx Proxy Manager:"
-    echo "   Add this to the 'Advanced' tab:"
-    echo ""
-    echo "   client_max_body_size 1G;"
-    echo "   proxy_request_buffering off;"
-    echo "   proxy_buffering off;"
-    echo "   proxy_read_timeout 3600;"
-    echo "   proxy_connect_timeout 60;"
-    echo "   proxy_send_timeout 600;"
+    echo "2. 🔧 Configure Caddy for Nextcloud:"
+    echo "   Add the configuration from 'caddy-nextcloud-config.txt' to your /etc/caddy/Caddyfile"
+    echo "   Then restart Caddy: sudo systemctl restart caddy"
     echo ""
     echo "3. 🌟 Once configured, access via:"
     echo "   https://$NEXTCLOUD_DOMAIN"

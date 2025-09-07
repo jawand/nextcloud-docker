@@ -27,12 +27,25 @@ Production-ready Nextcloud deployment using Docker Compose, optimized for perfor
    ```
    Port 8080 should be free for Nextcloud
 
+3. **Configure DNS for your domain:**
+   - Point your domain (e.g., `next.prismantis.com`) to your server's IP
+   - Wait for DNS propagation (5-60 minutes)
+   - Test with: `nslookup next.prismantis.com`
+
+4. **Ensure firewall ports are open:**
+   - Port 80 (HTTP) - Required for Let's Encrypt SSL validation
+   - Port 443 (HTTPS) - For SSL traffic
+   - Port 8080 should only be accessible locally
+
 ### Deployment
 
-1. **Deploy**: Run `./setup.sh` and follow the prompts
-2. **Configure Caddy**: Add configuration from `caddy-nextcloud-config.txt` to `/etc/caddy/Caddyfile`
-3. **Restart Caddy**: `sudo systemctl restart caddy`
-4. **Access**: Visit https://next.example.com
+1. **Configure DNS first**: Point your domain to your server's IP address
+2. **Deploy Nextcloud**: Run `./setup.sh` and follow the prompts
+3. **Configure Caddy**: Add configuration from `caddy-nextcloud-config.txt` to `/etc/caddy/Caddyfile`
+4. **Validate Caddy config**: `sudo caddy validate --config /etc/caddy/Caddyfile`
+5. **Restart Caddy**: `sudo systemctl restart caddy`
+6. **Wait for SSL**: Caddy will automatically obtain Let's Encrypt certificate
+7. **Access**: Visit https://your-domain.com
 
 ## Architecture
 
@@ -58,26 +71,57 @@ Internet → Caddy (Port 443) → Nextcloud App (Port 8080)
 - MariaDB tuned for low memory usage
 - Container memory limits to prevent OOM kills
 
-## Caddy Configuration
+## DNS Configuration
 
-**Add to your existing `/etc/caddy/Caddyfile`:**
+### Option 1: A Record (Simple)
+```
+Type: A
+Name: next (or your subdomain)
+Value: [Your server's public IP]
+TTL: 300
+```
+
+### Option 2: CNAME (Recommended for Azure)
+If using Azure VM with dynamic IP:
+```
+Type: CNAME
+Name: next
+Value: [Your Azure VM DNS name like: vm-name.region.cloudapp.azure.com]
+TTL: 300
+```
+
+## Caddy Configuration & SSL
+
+### 1. Add Nextcloud Configuration
+**Edit your existing `/etc/caddy/Caddyfile`:**
 
 ```caddy
-next.example.com {
+# Your existing n8n configuration
+your-n8n-domain.com {
+    reverse_proxy localhost:5678
+}
+
+# Add this for Nextcloud
+next.prismantis.com {
+    # Security headers
     header {
         Strict-Transport-Security "max-age=31536000; includeSubDomains"
         X-Frame-Options "SAMEORIGIN"
         X-Content-Type-Options "nosniff"
+        Permissions-Policy "interest-cohort=()"
     }
     
+    # Handle large file uploads
     request_body {
         max_size 1GB
     }
     
+    # Proxy to Nextcloud container
     reverse_proxy localhost:8080 {
         header_up X-Forwarded-Proto "https"
         header_up X-Forwarded-For {remote_host}
         header_up Host {host}
+        header_up X-Real-IP {remote_host}
         
         transport http {
             read_timeout 3600s
@@ -87,10 +131,29 @@ next.example.com {
 }
 ```
 
-**Then restart Caddy:**
+### 2. Validate and Restart Caddy
 ```bash
+# Test configuration syntax
+sudo caddy validate --config /etc/caddy/Caddyfile
+
+# If valid, restart Caddy
 sudo systemctl restart caddy
+
+# Monitor SSL certificate generation
+sudo journalctl -u caddy -f
 ```
+
+### 3. SSL Certificate (Automatic)
+Caddy automatically:
+- ✅ Obtains Let's Encrypt SSL certificates
+- ✅ Handles HTTP to HTTPS redirects  
+- ✅ Renews certificates before expiry
+- ✅ Serves traffic on port 443
+
+**Requirements for automatic SSL:**
+- Domain must resolve to your server
+- Ports 80 and 443 must be open
+- DNS propagation must be complete
 
 ## Management Commands
 
@@ -117,7 +180,7 @@ docker-compose exec nextcloud-app php occ maintenance:mode --off
 
 - All passwords are auto-generated during setup
 - Database and Redis are isolated in internal network
-- Only HTTP port 80 exposed internally (HTTPS handled by NPM)
+- Only HTTP port 8080 exposed locally (HTTPS handled by Caddy)
 - Trusted proxies configured for proper IP forwarding
 
 ## Troubleshooting
@@ -157,8 +220,60 @@ sudo caddy fmt --overwrite /etc/caddy/Caddyfile
 curl -I http://localhost:8080
 
 # Test through Caddy
-curl -I https://next.example.com
+curl -I https://your-domain.com
+
+# Check SSL certificate
+openssl s_client -connect your-domain.com:443 -servername your-domain.com
 ```
+
+### SSL Issues
+
+**If SSL certificate fails:**
+
+1. **Check DNS resolution:**
+   ```bash
+   nslookup your-domain.com
+   dig your-domain.com @8.8.8.8
+   ```
+
+2. **Verify firewall ports:**
+   ```bash
+   # Check if ports are open
+   sudo netstat -tuln | grep -E ':80|:443'
+   ```
+
+3. **Monitor Caddy SSL process:**
+   ```bash
+   sudo journalctl -u caddy -f
+   # Look for "obtaining certificate" messages
+   ```
+
+4. **Test HTTP challenge:**
+   ```bash
+   # Caddy needs port 80 for Let's Encrypt validation
+   curl -I http://your-domain.com/.well-known/acme-challenge/test
+   ```
+
+### Azure Firewall Configuration
+
+**Ensure these ports are open in your Network Security Group:**
+
+1. **Go to Azure Portal** → Virtual Machines → Your VM → Networking
+2. **Check inbound security rules** for:
+   - **Port 22** (SSH) - For management
+   - **Port 80** (HTTP) - Required for Let's Encrypt validation
+   - **Port 443** (HTTPS) - For SSL traffic
+   - **Port 8080** should NOT be exposed externally
+
+3. **Add rules if missing:**
+   ```
+   Priority: 1000
+   Name: Allow-HTTPS
+   Port: 443
+   Protocol: TCP
+   Source: Any
+   Action: Allow
+   ```
 
 ### Performance Issues
 

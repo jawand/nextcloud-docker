@@ -9,6 +9,7 @@ Production-ready Nextcloud deployment using Docker Compose, optimized for perfor
 - **Security**: Proper network isolation, secure defaults
 - **Domain Ready**: Pre-configured for next.example.com
 - **Caddy Compatible**: Works seamlessly with your existing n8n Caddy setup
+- **Azure Blob Integration**: Optional external storage for unlimited capacity
 
 ## Quick Start
 
@@ -316,3 +317,28 @@ docker-compose logs nextcloud-db
 1. Wait 60 seconds for MariaDB to fully start
 2. Check database logs: `docker-compose logs nextcloud-db`
 3. Verify MYSQL_PASSWORD in .env file
+
+## Azure Blob Storage Integration
+
+For unlimited storage capacity and better performance on your 1GB server:
+
+### Quick Setup
+1. **Create Azure Storage:**
+   ```bash
+   ./azure-storage-setup.sh
+   ```
+
+2. **Configure in Nextcloud:**
+   - Login as admin → Settings → Apps
+   - Enable "External storage support"
+   - Go to Administration → External Storage
+   - Add "Amazon S3" storage type
+   - Use Azure Blob credentials (see `azure-blob-integration-guide.md`)
+
+### Benefits
+- **Unlimited storage** without server disk limits
+- **Cost-effective** (~$0.018/GB/month)
+- **Better performance** for large files
+- **Automatic backups** and redundancy
+
+**See `azure-blob-integration-guide.md` for detailed setup instructions.**

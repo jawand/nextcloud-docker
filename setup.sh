@@ -1,34 +1,27 @@
 #!/bin/bash
 
 # Nextcloud Docker Compose Deployment Script
-# For use with existing Nginx Proxy Manager setup
+# For use with existing Caddy reverse proxy setup
 
 set -e  # Exit on any error
 
-# Colors for output
-RED='\033[0;31m'
-GREEN='\033[0;32m'
-YELLOW='\033[1;33m'
-BLUE='\033[0;34m'
-NC='\033[0m' # No Color
-
-echo -e "${GREEN}🚀 Nextcloud Docker Deployment Script${NC}"
-echo -e "${BLUE}   (Compatible with Caddy reverse proxy)${NC}"
-echo "=================================================="
+echo "Nextcloud Docker Deployment Script"
+echo "Compatible with Caddy reverse proxy"
+echo "=================================="
 
 # Check if required files exist in current directory
 REQUIRED_FILES=("docker-compose.yml" "nextcloud-custom.ini" "caddy-nextcloud-config.txt")
 for file in "${REQUIRED_FILES[@]}"; do
     if [ ! -f "$file" ]; then
-        echo -e "${RED}❌ Required file '$file' not found in current directory${NC}"
-        echo -e "${YELLOW}💡 Please run this script from the nextcloud-docker directory${NC}"
+        echo "ERROR: Required file '$file' not found in current directory"
+        echo "Please run this script from the nextcloud-docker directory"
         exit 1
     fi
 done
 
 # Check if running as root
 if [[ $EUID -eq 0 ]]; then
-   echo -e "${RED}❌ This script should not be run as root${NC}"
+   echo "ERROR: This script should not be run as root"
    exit 1
 fi
 
@@ -38,35 +31,34 @@ generate_password() {
 }
 
 # Check dependencies
-echo -e "${YELLOW}📋 Checking dependencies...${NC}"
-command -v docker >/dev/null 2>&1 || { echo -e "${RED}❌ Docker is required but not installed.${NC}" >&2; exit 1; }
-command -v docker-compose >/dev/null 2>&1 || { echo -e "${RED}❌ Docker Compose is required but not installed.${NC}" >&2; exit 1; }
+echo "Checking dependencies..."
+command -v docker >/dev/null 2>&1 || { echo "ERROR: Docker is required but not installed." >&2; exit 1; }
+command -v docker-compose >/dev/null 2>&1 || { echo "ERROR: Docker Compose is required but not installed." >&2; exit 1; }
 
 # Check available memory
 TOTAL_MEM=$(free -m | awk 'NR==2{printf "%.0f", $2}')
-echo -e "${YELLOW}💾 Available memory: ${TOTAL_MEM}MB${NC}"
+echo "Available memory: ${TOTAL_MEM}MB"
 if [ "$TOTAL_MEM" -lt 900 ]; then
-    echo -e "${RED}⚠️  Warning: Less than 1GB RAM detected. Performance may be limited.${NC}"
-    echo -e "${YELLOW}💡 Consider adding swap space or upgrading RAM.${NC}"
+    echo "WARNING: Less than 1GB RAM detected. Performance may be limited."
+    echo "Consider adding swap space or upgrading RAM."
     read -p "Continue anyway? [y/N]: " CONTINUE_LOW_MEM
     if [[ ! $CONTINUE_LOW_MEM =~ ^[Yy]$ ]]; then
         exit 1
     fi
 fi
 
-# Check if Caddy is running (from n8n setup)
+# Check if Caddy is running
 if ! systemctl is-active --quiet caddy; then
-    echo -e "${RED}❌ Caddy is not running. Is your n8n setup configured?${NC}"
-    echo -e "${YELLOW}💡 Make sure your n8n setup is running first.${NC}"
+    echo "ERROR: Caddy is not running. Make sure Caddy is configured first."
     exit 1
 fi
 
-echo -e "${GREEN}✅ Found Caddy running${NC}"
+echo "Caddy is running"
 
 # Check if port 8080 is available
 if netstat -tuln | grep -q ":8080 "; then
-    echo -e "${RED}❌ Port 8080 is already in use${NC}"
-    echo -e "${YELLOW}💡 Please free up port 8080 or modify docker-compose.yml${NC}"
+    echo "ERROR: Port 8080 is already in use"
+    echo "Please free up port 8080 or modify docker-compose.yml"
     exit 1
 fi
 
@@ -75,14 +67,14 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Create project directory
 PROJECT_DIR="$HOME/nextcloud"
-echo -e "${YELLOW}📁 Creating project directory: $PROJECT_DIR${NC}"
+echo "Creating project directory: $PROJECT_DIR"
 mkdir -p "$PROJECT_DIR"
 
 # Copy necessary files to project directory
-echo -e "${YELLOW}📋 Copying configuration files...${NC}"
-cp "$SCRIPT_DIR/docker-compose.yml" "$PROJECT_DIR/" || { echo -e "${RED}❌ docker-compose.yml not found in script directory${NC}"; exit 1; }
-cp "$SCRIPT_DIR/nextcloud-custom.ini" "$PROJECT_DIR/" || { echo -e "${RED}❌ nextcloud-custom.ini not found in script directory${NC}"; exit 1; }
-cp "$SCRIPT_DIR/caddy-nextcloud-config.txt" "$PROJECT_DIR/" || { echo -e "${RED}❌ caddy-nextcloud-config.txt not found in script directory${NC}"; exit 1; }
+echo "Copying configuration files..."
+cp "$SCRIPT_DIR/docker-compose.yml" "$PROJECT_DIR/" || { echo "ERROR: docker-compose.yml not found in script directory"; exit 1; }
+cp "$SCRIPT_DIR/nextcloud-custom.ini" "$PROJECT_DIR/" || { echo "ERROR: nextcloud-custom.ini not found in script directory"; exit 1; }
+cp "$SCRIPT_DIR/caddy-nextcloud-config.txt" "$PROJECT_DIR/" || { echo "ERROR: caddy-nextcloud-config.txt not found in script directory"; exit 1; }
 
 cd "$PROJECT_DIR"
 
@@ -91,7 +83,7 @@ mkdir -p data/nextcloud
 
 # Create .env file if it doesn't exist
 if [ ! -f .env ]; then
-    echo -e "${YELLOW}⚙️  Creating environment configuration...${NC}"
+    echo "Creating environment configuration..."
     
     # Get user inputs
     read -p "Enter your Nextcloud domain [next.example.com]: " DOMAIN
@@ -105,7 +97,7 @@ if [ ! -f .env ]; then
         read -s -p "Confirm admin password: " ADMIN_PASSWORD_CONFIRM
         echo
         [ "$ADMIN_PASSWORD" = "$ADMIN_PASSWORD_CONFIRM" ] && break
-        echo -e "${RED}❌ Passwords don't match. Please try again.${NC}"
+        echo "ERROR: Passwords don't match. Please try again."
     done
     
     # Generate random passwords
@@ -132,9 +124,9 @@ NEXTCLOUD_TRUSTED_DOMAINS=$DOMAIN,localhost
 # Timezone
 TZ=UTC
 EOF
-    echo -e "${GREEN}✅ Environment file created${NC}"
+    echo "Environment file created"
 else
-    echo -e "${GREEN}✅ Environment file already exists${NC}"
+    echo "Environment file already exists"
     source .env
 fi
 
@@ -142,59 +134,56 @@ fi
 chmod 600 .env
 
 # Check for container name conflicts
-echo -e "${YELLOW}🔍 Checking for container name conflicts...${NC}"
+echo "Checking for container name conflicts..."
 CONFLICTING_CONTAINERS=$(docker ps -a --format "table {{.Names}}" | grep -E "nextcloud-(db|redis|app|cron)" || true)
 if [ ! -z "$CONFLICTING_CONTAINERS" ]; then
-    echo -e "${YELLOW}⚠️  Found existing containers with nextcloud names:${NC}"
+    echo "Found existing containers with nextcloud names:"
     echo "$CONFLICTING_CONTAINERS"
     read -p "Do you want to remove these containers? [y/N]: " REMOVE_CONTAINERS
     if [[ $REMOVE_CONTAINERS =~ ^[Yy]$ ]]; then
         echo "$CONFLICTING_CONTAINERS" | tail -n +2 | xargs -r docker rm -f
-        echo -e "${GREEN}✅ Removed conflicting containers${NC}"
+        echo "Removed conflicting containers"
     fi
 fi
 
 # Start services
-echo -e "${YELLOW}🚀 Starting Nextcloud services...${NC}"
+echo "Starting Nextcloud services..."
 docker-compose pull
 docker-compose up -d
 
 # Wait for services to be ready
-echo -e "${YELLOW}⏳ Waiting for services to start...${NC}"
+echo "Waiting for services to start..."
 sleep 45
 
 # Check if services are running
 if docker-compose ps | grep -q "Up"; then
-    echo -e "${GREEN}🎉 Nextcloud deployment completed successfully!${NC}"
+    echo "Nextcloud deployment completed successfully!"
     echo ""
-    echo -e "${BLUE}📋 Next Steps:${NC}"
-    echo "1. 🌐 Configure Caddy for Nextcloud:"
+    echo "Next Steps:"
+    echo "1. Configure Caddy for Nextcloud:"
     echo "   - Copy configuration from 'caddy-nextcloud-config.txt'"
     echo "   - Add it to your /etc/caddy/Caddyfile"
     echo "   - Update domain name to: $NEXTCLOUD_DOMAIN"
+    echo "   - Restart Caddy: sudo systemctl restart caddy"
     echo ""
-    echo "2. 🔧 Configure Caddy for Nextcloud:"
-    echo "   Add the configuration from 'caddy-nextcloud-config.txt' to your /etc/caddy/Caddyfile"
-    echo "   Then restart Caddy: sudo systemctl restart caddy"
-    echo ""
-    echo "3. 🌟 Once configured, access via:"
+    echo "2. Access Nextcloud:"
     echo "   https://$NEXTCLOUD_DOMAIN"
     echo ""
-    echo "👤 Admin credentials:"
+    echo "Admin credentials:"
     echo "   Username: $ADMIN_USER"
     echo "   Password: [as entered during setup]"
     echo ""
-    echo "🔧 Management commands:"
+    echo "Management commands:"
     echo "   Start:   cd $PROJECT_DIR && docker-compose up -d"
     echo "   Stop:    cd $PROJECT_DIR && docker-compose down"  
     echo "   Logs:    cd $PROJECT_DIR && docker-compose logs -f"
     echo "   Update:  cd $PROJECT_DIR && docker-compose pull && docker-compose up -d"
 else
-    echo -e "${RED}❌ Some services failed to start. Check logs with: docker-compose logs${NC}"
+    echo "ERROR: Some services failed to start. Check logs with: docker-compose logs"
     docker-compose ps
     exit 1
 fi
 
-# Show all containers (including n8n)
-echo -e "${YELLOW}📊 All running containers:${NC}"
+# Show all containers
+echo "All running containers:"
 docker ps --format "table {{.Names}}\t{{.Status}}\t{{.Ports}}"

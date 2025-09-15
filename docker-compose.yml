@@ -83,6 +83,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./nextcloud-custom.ini:/usr/local/etc/php/conf.d/nextcloud-custom.ini:ro
       - /mnt/blobfuse:/mnt/azure-blob:rw
+      - ./nextcloud-entrypoint.sh:/nextcloud-entrypoint.sh:ro
     environment:
       - MYSQL_HOST=nextcloud-db
       - MYSQL_DATABASE=nextcloud
@@ -101,6 +102,7 @@ services:
       - PHP_MEMORY_LIMIT=512M
       - PHP_UPLOAD_LIMIT=1G
       - APACHE_BODY_LIMIT=1073741824
+    entrypoint: ["/nextcloud-entrypoint.sh"]
     depends_on:
       - nextcloud-db
       - nextcloud-redis
@@ -142,31 +144,6 @@ services:
     networks:
       - nextcloud-network
 
-  # Azure external storage configuration
-  nextcloud-azure-config:
-    image: nextcloud:30.0-apache
-    container_name: nextcloud-azure-config
-    volumes:
-      - nextcloud_app_data:/var/www/html
-      - /mnt/blobfuse:/mnt/azure-blob:rw
-    command: >
-      bash -c "
-        echo 'Waiting for Nextcloud to be ready...' &&
-        sleep 30 &&
-        until php /var/www/html/occ status | grep -q 'installed: true'; do sleep 5; done &&
-        echo 'Enabling External Storage app...' &&
-        php /var/www/html/occ app:enable files_external &&
-        echo 'Configuring Azure Blob Storage as external storage...' &&
-        php /var/www/html/occ files_external:create 'Azure Blob Storage' local 'null::null' -c datadir='/mnt/azure-blob' --scope='personal' --add-user='admin' &&
-        echo 'Azure Blob Storage configuration completed!'
-      "
-    depends_on:
-      - nextcloud-app
-    networks:
-      - nextcloud-network
-    restart: "no"
-    profiles:
-      - configure
 
 networks:
   nextcloud-network:

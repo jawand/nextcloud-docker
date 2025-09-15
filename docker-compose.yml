@@ -1,6 +1,28 @@
 version: "3.8"
 
 services:
+  # BlobFuse setup service (runs once to configure host)
+  blobfuse-setup:
+    image: ubuntu:22.04
+    container_name: blobfuse-setup
+    privileged: true
+    volumes:
+      - /:/host
+      - ./setup-blobfuse.sh:/setup-blobfuse.sh:ro
+    environment:
+      - AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT}
+      - AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}
+      - AZURE_CONTAINER_NAME=${AZURE_CONTAINER_NAME}
+    command: >
+      bash -c "
+        echo 'Setting up BlobFuse on host system...' &&
+        chroot /host /bin/bash -c 'cd /tmp && cp /setup-blobfuse.sh . && chmod +x setup-blobfuse.sh && ./setup-blobfuse.sh' &&
+        echo 'BlobFuse setup completed'
+      "
+    restart: "no"
+    profiles:
+      - setup
+
   # Database service
   nextcloud-db:
     image: mariadb:11.4
@@ -60,6 +82,7 @@ services:
       - nextcloud_data:/var/www/html/data
       - /etc/localtime:/etc/localtime:ro
       - ./nextcloud-custom.ini:/usr/local/etc/php/conf.d/nextcloud-custom.ini:ro
+      - /mnt/blobfuse:/mnt/azure-blob:rw
     environment:
       - MYSQL_HOST=nextcloud-db
       - MYSQL_DATABASE=nextcloud
@@ -83,6 +106,11 @@ services:
       - nextcloud-redis
     networks:
       - nextcloud-network
+    healthcheck:
+      test: ["CMD-SHELL", "test -d /mnt/azure-blob || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   # Cron job service for background tasks
   nextcloud-cron:
@@ -99,6 +127,7 @@ services:
       - nextcloud_app_data:/var/www/html
       - nextcloud_data:/var/www/html/data
       - /etc/localtime:/etc/localtime:ro
+      - /mnt/blobfuse:/mnt/azure-blob:rw
     entrypoint: /cron.sh
     environment:
       - MYSQL_HOST=nextcloud-db
@@ -112,6 +141,32 @@ services:
       - nextcloud-redis
     networks:
       - nextcloud-network
+
+  # Azure external storage configuration
+  nextcloud-azure-config:
+    image: nextcloud:30.0-apache
+    container_name: nextcloud-azure-config
+    volumes:
+      - nextcloud_app_data:/var/www/html
+      - /mnt/blobfuse:/mnt/azure-blob:rw
+    command: >
+      bash -c "
+        echo 'Waiting for Nextcloud to be ready...' &&
+        sleep 30 &&
+        until php /var/www/html/occ status | grep -q 'installed: true'; do sleep 5; done &&
+        echo 'Enabling External Storage app...' &&
+        php /var/www/html/occ app:enable files_external &&
+        echo 'Configuring Azure Blob Storage as external storage...' &&
+        php /var/www/html/occ files_external:create 'Azure Blob Storage' local 'null::null' -c datadir='/mnt/azure-blob' --scope='personal' --add-user='admin' &&
+        echo 'Azure Blob Storage configuration completed!'
+      "
+    depends_on:
+      - nextcloud-app
+    networks:
+      - nextcloud-network
+    restart: "no"
+    profiles:
+      - configure
 
 networks:
   nextcloud-network:

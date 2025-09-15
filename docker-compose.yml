@@ -3,7 +3,7 @@ version: "3.8"
 services:
   # BlobFuse setup service (runs once to configure host)
   blobfuse-setup:
-    image: ubuntu:22.04
+    image: alpine:3.19
     container_name: blobfuse-setup
     privileged: true
     volumes:
@@ -14,7 +14,7 @@ services:
       - AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}
       - AZURE_CONTAINER_NAME=${AZURE_CONTAINER_NAME}
     command: >
-      bash -c "
+      sh -c "
         echo 'Setting up BlobFuse on host system...' &&
         chroot /host /bin/bash -c 'cd /tmp && cp /setup-blobfuse.sh . && chmod +x setup-blobfuse.sh && ./setup-blobfuse.sh' &&
         echo 'BlobFuse setup completed'

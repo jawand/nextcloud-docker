@@ -32,13 +32,8 @@ next.prismantis.com {
     reverse_proxy localhost:8080 {
         # Essential headers for Nextcloud
         header_up X-Forwarded-Proto "https"
-        header_up X-Forwarded-For {remote_host}
         header_up Host {host}
         header_up X-Real-IP {remote_host}
-        header_up X-Forwarded-Host {host}
-
-        # Preserve all original headers including Content-Length
-        header_up >X-Forwarded-*
 
         # Don't buffer uploads - stream them directly
         flush_interval -1
@@ -50,8 +45,6 @@ next.prismantis.com {
             dial_timeout 30s
             response_header_timeout 30s
             expect_continue_timeout 10s
-            # Disable response buffering
-            max_response_header_size 16384
         }
     }
 }

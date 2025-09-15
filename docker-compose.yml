@@ -16,7 +16,8 @@ services:
     command: >
       sh -c "
         echo 'Setting up BlobFuse on host system...' &&
-        chroot /host /bin/bash -c 'cd /tmp && cp /setup-blobfuse.sh . && chmod +x setup-blobfuse.sh && ./setup-blobfuse.sh' &&
+        cp /setup-blobfuse.sh /host/tmp/setup-blobfuse.sh &&
+        chroot /host /bin/bash -c 'cd /tmp && chmod +x setup-blobfuse.sh && ./setup-blobfuse.sh' &&
         echo 'BlobFuse setup completed'
       "
     restart: "no"

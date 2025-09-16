@@ -1,29 +1,6 @@
 version: "3.8"
 
 services:
-  # BlobFuse setup service (runs once to configure host)
-  blobfuse-setup:
-    image: alpine:3.19
-    container_name: blobfuse-setup
-    privileged: true
-    volumes:
-      - /:/host
-      - ./setup-blobfuse.sh:/setup-blobfuse.sh:ro
-    environment:
-      - AZURE_STORAGE_ACCOUNT=${AZURE_STORAGE_ACCOUNT}
-      - AZURE_STORAGE_KEY=${AZURE_STORAGE_KEY}
-      - AZURE_CONTAINER_NAME=${AZURE_CONTAINER_NAME}
-    command: >
-      sh -c "
-        echo 'Setting up BlobFuse on host system...' &&
-        cp /setup-blobfuse.sh /host/tmp/setup-blobfuse.sh &&
-        chroot /host /bin/bash -c 'cd /tmp && chmod +x setup-blobfuse.sh && ./setup-blobfuse.sh' &&
-        echo 'BlobFuse setup completed'
-      "
-    restart: "no"
-    profiles:
-      - setup
-
   # Database service
   nextcloud-db:
     image: mariadb:11.4

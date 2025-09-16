@@ -1,11 +1,12 @@
 #!/bin/bash
 
-# BlobFuse Setup for Nextcloud External Storage
-# Following: https://github.com/nextcloud/server/issues/2027#issuecomment-1077183842
+# BlobFuse2 Setup for Nextcloud External Storage
+# Updated for BlobFuse2 using Microsoft's official documentation
+# https://learn.microsoft.com/en-us/azure/storage/blobs/blobfuse2-how-to-deploy
 
 set -e
 
-echo "🔧 Setting up BlobFuse for Azure Blob Storage..."
+echo "🔧 Setting up BlobFuse2 for Azure Blob Storage..."
 
 # Check if running as root
 if [ "$EUID" -ne 0 ]; then
@@ -27,33 +28,30 @@ echo "📋 Configuration:"
 echo "Storage Account: $AZURE_STORAGE_ACCOUNT"
 echo "Container: $AZURE_CONTAINER_NAME"
 
-# Detect OS and install BlobFuse
+# Detect OS and install BlobFuse2
 if [ -f /etc/debian_version ]; then
-    echo "🐧 Detected Debian/Ubuntu - Installing BlobFuse..."
+    echo "🐧 Detected Debian/Ubuntu - Installing BlobFuse2..."
 
     # Install dependencies
     apt-get update
-    apt-get install -y wget apt-transport-https software-properties-common
+    apt-get install -y wget apt-transport-https software-properties-common lsb-release
 
-    # Add Microsoft repository
-    wget -q https://packages.microsoft.com/config/ubuntu/$(lsb_release -rs)/packages-microsoft-prod.deb
+    # Add Microsoft repository for Ubuntu 20.04 (works for most Ubuntu versions)
+    echo "Adding Microsoft repository..."
+    wget -q https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb
     dpkg -i packages-microsoft-prod.deb
     apt-get update
 
-    # Install BlobFuse
-    apt-get install -y blobfuse fuse
-
-elif [ -f /etc/redhat-release ]; then
-    echo "🎩 Detected RHEL/CentOS - Installing BlobFuse..."
-
-    # Add Microsoft repository
-    rpm -Uvh https://packages.microsoft.com/config/rhel/8/packages-microsoft-prod.rpm
-
-    # Install BlobFuse
-    yum install -y blobfuse fuse
-
+    # Install FUSE3 dependencies and BlobFuse2
+    echo "Installing FUSE3 and BlobFuse2..."
+    apt-get install -y libfuse3-dev fuse3 blobfuse2
 else
-    echo "❌ Unsupported OS. Please install BlobFuse manually."
+    echo "❌ Unsupported OS detected:"
+    echo "   Supported: Ubuntu/Debian, RHEL/CentOS, SUSE Linux"
+    echo "   Current OS info:"
+    cat /etc/os-release 2>/dev/null || echo "   No /etc/os-release found"
+    echo ""
+    echo "   Please install BlobFuse2 manually or run on supported OS"
     exit 1
 fi
 
@@ -67,35 +65,47 @@ mkdir -p /opt/nextcloud/azure-config
 chmod 755 /mnt/blobfuse
 chmod 700 /mnt/blobfusetmp
 
-# Create BlobFuse configuration file
-echo "📝 Creating BlobFuse configuration..."
-cat > /opt/nextcloud/azure-config/connection.cfg << EOF
-accountName $AZURE_STORAGE_ACCOUNT
-accountKey $AZURE_STORAGE_KEY
-containerName $AZURE_CONTAINER_NAME
+# Create BlobFuse2 configuration file
+echo "📝 Creating BlobFuse2 configuration..."
+cat > /opt/nextcloud/azure-config/config.yaml << EOF
+# BlobFuse2 Configuration for Nextcloud
+account-name: $AZURE_STORAGE_ACCOUNT
+account-key: $AZURE_STORAGE_KEY
+container-name: $AZURE_CONTAINER_NAME
+
+# Logging
+log-level: log_warning
+log-file-path: /var/log/blobfuse2.log
+
+# File cache configuration for better performance
+file_cache:
+  path: /mnt/blobfusetmp
+  timeout-sec: 120
+
+# Stream configuration
+stream:
+  block-size-mb: 16
+  max-buffers: 16
+  buffer-size-mb: 16
 EOF
 
 # Secure the config file
-chmod 600 /opt/nextcloud/azure-config/connection.cfg
+chmod 600 /opt/nextcloud/azure-config/config.yaml
 
 # Create mount script
 echo "📜 Creating mount script..."
 cat > /opt/nextcloud/azure-config/mount-blobfuse.sh << 'EOF'
 #!/bin/bash
 
-# Mount BlobFuse
-blobfuse /mnt/blobfuse \
-    --tmp-path=/mnt/blobfusetmp \
-    --config-file=/opt/nextcloud/azure-config/connection.cfg \
-    --log-level=LOG_WARNING \
-    --file-cache-timeout-in-seconds=120 \
-    --use-https=true \
-    -o attr_timeout=240 \
-    -o entry_timeout=240 \
-    -o negative_timeout=120 \
-    -o allow_other
+# Mount BlobFuse2
+blobfuse2 mount /mnt/blobfuse --config-file=/opt/nextcloud/azure-config/config.yaml
 
-echo "✅ BlobFuse mounted at /mnt/blobfuse"
+if [ $? -eq 0 ]; then
+    echo "✅ BlobFuse2 mounted at /mnt/blobfuse"
+else
+    echo "❌ BlobFuse2 mount failed"
+    exit 1
+fi
 EOF
 
 chmod +x /opt/nextcloud/azure-config/mount-blobfuse.sh
@@ -104,9 +114,15 @@ chmod +x /opt/nextcloud/azure-config/mount-blobfuse.sh
 cat > /opt/nextcloud/azure-config/unmount-blobfuse.sh << 'EOF'
 #!/bin/bash
 
-# Unmount BlobFuse
-fusermount -u /mnt/blobfuse
-echo "✅ BlobFuse unmounted"
+# Unmount BlobFuse2
+blobfuse2 unmount /mnt/blobfuse
+
+if [ $? -eq 0 ]; then
+    echo "✅ BlobFuse2 unmounted"
+else
+    echo "❌ BlobFuse2 unmount failed"
+    exit 1
+fi
 EOF
 
 chmod +x /opt/nextcloud/azure-config/unmount-blobfuse.sh
@@ -155,7 +171,7 @@ else
 fi
 
 echo ""
-echo "🎉 BlobFuse setup completed!"
+echo "🎉 BlobFuse2 setup completed!"
 echo ""
 echo "📋 Next steps:"
 echo "1. Update docker-compose.yml to mount /mnt/blobfuse"
@@ -163,6 +179,7 @@ echo "2. Configure Nextcloud external storage to use the mounted directory"
 echo "3. Start/restart your Nextcloud containers"
 echo ""
 echo "🔧 Management commands:"
-echo "sudo systemctl start blobfuse    # Mount BlobFuse"
-echo "sudo systemctl stop blobfuse     # Unmount BlobFuse"
+echo "sudo systemctl start blobfuse    # Mount BlobFuse2"
+echo "sudo systemctl stop blobfuse     # Unmount BlobFuse2"
 echo "sudo systemctl status blobfuse   # Check status"
+echo "sudo journalctl -u blobfuse -f   # View logs"

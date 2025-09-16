@@ -23,8 +23,8 @@ Complete Nextcloud deployment using Docker Compose with Caddy reverse proxy and 
 ## Quick Setup
 
 1. **Configure environment**: Create `.env` file with your Azure and Nextcloud settings
-2. **Setup BlobFuse**: `docker-compose --profile setup up blobfuse-setup`
-3. **Start services**: `docker-compose up -d` (Azure storage auto-configures)
+2. **Setup Azure BlobFuse**: `sudo ./setup-azure-blobfuse.sh` (installs BlobFuse on HOST machine)
+3. **Start Nextcloud**: `./setup.sh` (starts Docker services, auto-configures Azure storage)
 4. **Configure Caddy**: Add configuration from `caddy-nextcloud-config.txt` to `/etc/caddy/Caddyfile`
 5. **Restart Caddy**: `sudo systemctl restart caddy`
 6. **Access**: Visit https://your-domain.com
@@ -76,10 +76,17 @@ TTL: 300
 
 ## What the Setup Does
 
-1. **BlobFuse setup profile**: Installs BlobFuse on host system with systemd service
-2. **Main services**: Starts Nextcloud with optimized 2GB RAM configuration
-3. **Configure profile**: Sets up Azure Blob Storage as external storage for user data
-4. **Caddy integration**: Handles large file uploads properly
+### Azure BlobFuse Setup (`setup-azure-blobfuse.sh`):
+⚠️ **Installs directly on HOST machine (not in Docker)**
+1. Installs BlobFuse package and dependencies
+2. Creates mount point at `/mnt/blobfuse` on HOST
+3. Creates systemd service for automatic mounting
+4. Mounts Azure Blob Storage as a filesystem on HOST
+
+### Nextcloud Setup (`setup.sh`):
+1. Starts Nextcloud services with optimized 2GB RAM configuration
+2. Automatically detects Azure Blob mount and configures external storage
+3. Sets up database, Redis cache, and cron services
 
 ## Caddy Configuration
 
@@ -105,8 +112,8 @@ Caddy will automatically obtain SSL certificates from Let's Encrypt.
 
 ```bash
 # One-time setup (run in order)
-docker-compose --profile setup up blobfuse-setup  # Install BlobFuse
-docker-compose up -d                               # Start services (auto-configures Azure)
+sudo ./setup-azure-blobfuse.sh          # Install BlobFuse on HOST
+./setup.sh                              # Start Nextcloud services
 
 # Daily operations
 docker-compose up -d                    # Start services
@@ -114,10 +121,11 @@ docker-compose down                     # Stop services
 docker-compose logs -f nextcloud-app    # View logs
 docker-compose pull && docker-compose up -d  # Update images
 
-# BlobFuse management (after setup)
+# BlobFuse management (HOST machine)
 sudo systemctl start blobfuse           # Mount Azure storage
 sudo systemctl stop blobfuse            # Unmount Azure storage
 sudo systemctl status blobfuse          # Check mount status
+mountpoint /mnt/blobfuse                 # Verify mount
 
 # Caddy management
 sudo systemctl status caddy             # Check Caddy status

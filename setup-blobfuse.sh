@@ -62,7 +62,7 @@ if [ -f /etc/debian_version ]; then
 
     # Add Microsoft repository for Ubuntu 20.04 (works for most Ubuntu versions)
     echo "Adding Microsoft repository..."
-    wget -q https://packages.microsoft.com/config/ubuntu/20.04/packages-microsoft-prod.deb
+    wget -q https://packages.microsoft.com/config/ubuntu/22.04/packages-microsoft-prod.deb
     dpkg -i packages-microsoft-prod.deb
     apt-get update
 

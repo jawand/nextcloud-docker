@@ -61,7 +61,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./nextcloud-custom.ini:/usr/local/etc/php/conf.d/nextcloud-custom.ini:ro
       - /mnt/blobfuse:/mnt/azure-blob:rw
-      - ${PWD}/nextcloud-entrypoint.sh:/nextcloud-entrypoint.sh:ro
+      - ./nextcloud-entrypoint.sh:/usr/local/bin/nextcloud-entrypoint.sh:ro
     environment:
       - MYSQL_HOST=nextcloud-db
       - MYSQL_DATABASE=nextcloud
@@ -80,7 +80,7 @@ services:
       - PHP_MEMORY_LIMIT=512M
       - PHP_UPLOAD_LIMIT=1G
       - APACHE_BODY_LIMIT=1073741824
-    entrypoint: ["/nextcloud-entrypoint.sh"]
+    entrypoint: ["/usr/local/bin/nextcloud-entrypoint.sh"]
     depends_on:
       - nextcloud-db
       - nextcloud-redis

@@ -14,13 +14,37 @@ if [ "$EUID" -ne 0 ]; then
     exit 1
 fi
 
+# Try to load environment variables from .env file
+if [ -f ".env" ]; then
+    echo "📋 Loading configuration from .env file..."
+    set -a  # Export all variables
+    source .env
+    set +a  # Stop exporting
+elif [ -f "../.env" ]; then
+    echo "📋 Loading configuration from ../.env file..."
+    set -a  # Export all variables
+    source ../.env
+    set +a  # Stop exporting
+fi
+
 # Check if required environment variables are set
 if [ -z "$AZURE_STORAGE_ACCOUNT" ] || [ -z "$AZURE_STORAGE_KEY" ] || [ -z "$AZURE_CONTAINER_NAME" ]; then
     echo "❌ Required environment variables not set!"
-    echo "Please set the following:"
-    echo "export AZURE_STORAGE_ACCOUNT=your_storage_account_name"
-    echo "export AZURE_STORAGE_KEY=your_storage_account_key"
-    echo "export AZURE_CONTAINER_NAME=your_container_name"
+    echo ""
+    echo "Please either:"
+    echo "1. Create .env file in current directory with:"
+    echo "   AZURE_STORAGE_ACCOUNT=your_storage_account_name"
+    echo "   AZURE_STORAGE_KEY=your_storage_account_key"
+    echo "   AZURE_CONTAINER_NAME=your_container_name"
+    echo ""
+    echo "2. Or export them manually:"
+    echo "   export AZURE_STORAGE_ACCOUNT=your_storage_account_name"
+    echo "   export AZURE_STORAGE_KEY=your_storage_account_key"
+    echo "   export AZURE_CONTAINER_NAME=your_container_name"
+    echo "   sudo -E ./setup-blobfuse.sh"
+    echo ""
+    echo "3. Or use the wrapper script:"
+    echo "   sudo ./setup-azure-blobfuse.sh"
     exit 1
 fi
 

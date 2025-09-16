@@ -127,13 +127,38 @@ echo "📜 Creating mount script..."
 cat > /opt/nextcloud/azure-config/mount-blobfuse.sh << 'EOF'
 #!/bin/bash
 
+# BlobFuse2 Mount Script
+set -e
+
+echo "Starting BlobFuse2 mount process..."
+
+# Check if already mounted
+if mountpoint -q /mnt/blobfuse 2>/dev/null; then
+    echo "✅ /mnt/blobfuse is already mounted"
+    exit 0
+fi
+
+# Check if config file exists
+if [ ! -f /opt/nextcloud/azure-config/config.yaml ]; then
+    echo "❌ Config file not found: /opt/nextcloud/azure-config/config.yaml"
+    exit 1
+fi
+
+# Check if mount point exists
+if [ ! -d /mnt/blobfuse ]; then
+    echo "❌ Mount point does not exist: /mnt/blobfuse"
+    exit 1
+fi
+
 # Mount BlobFuse2
+echo "Executing: blobfuse2 mount /mnt/blobfuse --config-file=/opt/nextcloud/azure-config/config.yaml"
 blobfuse2 mount /mnt/blobfuse --config-file=/opt/nextcloud/azure-config/config.yaml
 
-if [ $? -eq 0 ]; then
-    echo "✅ BlobFuse2 mounted at /mnt/blobfuse"
+# Verify mount
+if mountpoint -q /mnt/blobfuse; then
+    echo "✅ BlobFuse2 mounted successfully at /mnt/blobfuse"
 else
-    echo "❌ BlobFuse2 mount failed"
+    echo "❌ BlobFuse2 mount command completed but mount verification failed"
     exit 1
 fi
 EOF
@@ -144,13 +169,26 @@ chmod +x /opt/nextcloud/azure-config/mount-blobfuse.sh
 cat > /opt/nextcloud/azure-config/unmount-blobfuse.sh << 'EOF'
 #!/bin/bash
 
+# BlobFuse2 Unmount Script
+set -e
+
+echo "Starting BlobFuse2 unmount process..."
+
+# Check if mounted
+if ! mountpoint -q /mnt/blobfuse 2>/dev/null; then
+    echo "✅ /mnt/blobfuse is not mounted"
+    exit 0
+fi
+
 # Unmount BlobFuse2
+echo "Executing: blobfuse2 unmount /mnt/blobfuse"
 blobfuse2 unmount /mnt/blobfuse
 
-if [ $? -eq 0 ]; then
-    echo "✅ BlobFuse2 unmounted"
+# Verify unmount
+if ! mountpoint -q /mnt/blobfuse 2>/dev/null; then
+    echo "✅ BlobFuse2 unmounted successfully"
 else
-    echo "❌ BlobFuse2 unmount failed"
+    echo "❌ BlobFuse2 unmount command completed but verification failed"
     exit 1
 fi
 EOF
@@ -161,15 +199,17 @@ chmod +x /opt/nextcloud/azure-config/unmount-blobfuse.sh
 echo "🔧 Creating systemd service..."
 cat > /etc/systemd/system/blobfuse.service << EOF
 [Unit]
-Description=Azure BlobFuse Mount
-After=network.target
+Description=Azure BlobFuse2 Mount
+After=network-online.target
+Wants=network-online.target
 
 [Service]
-Type=forking
+Type=oneshot
 ExecStart=/opt/nextcloud/azure-config/mount-blobfuse.sh
 ExecStop=/opt/nextcloud/azure-config/unmount-blobfuse.sh
 RemainAfterExit=yes
-Restart=on-failure
+TimeoutStartSec=30
+Restart=no
 
 [Install]
 WantedBy=multi-user.target

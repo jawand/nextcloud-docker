@@ -111,7 +111,7 @@ logging:
 file_cache:
   path: /mnt/blobfusetmp
   timeout-sec: 300
-  max-size-mb: 2048
+  max-size-mb: 0      # unlimited cache size
 
 # Stream configuration for memory usage
 stream:
@@ -128,6 +128,7 @@ libfuse:
   default-permission: 0755
   direct-io: false
   kernel-cache: true
+  max-size-mb: 0      # 0 = unlimited cache size
 EOF
 
 # Secure the config file

@@ -61,7 +61,7 @@ services:
       - /etc/localtime:/etc/localtime:ro
       - ./nextcloud-custom.ini:/usr/local/etc/php/conf.d/nextcloud-custom.ini:ro
       - /mnt/blobfuse:/mnt/azure-blob:rw
-      - ./nextcloud-entrypoint.sh:/nextcloud-entrypoint.sh:ro
+      - ${PWD}/nextcloud-entrypoint.sh:/nextcloud-entrypoint.sh:ro
     environment:
       - MYSQL_HOST=nextcloud-db
       - MYSQL_DATABASE=nextcloud

@@ -110,13 +110,24 @@ logging:
 # File cache configuration for better performance
 file_cache:
   path: /mnt/blobfusetmp
-  timeout-sec: 120
+  timeout-sec: 300
+  max-size-mb: 2048
 
 # Stream configuration for memory usage
 stream:
-  block-size-mb: 16
-  max-buffers: 16
-  buffer-size-mb: 16
+  block-size-mb: 64
+  max-buffers: 32
+  buffer-size-mb: 64
+
+# Performance optimizations for large files (ALL NEW)
+libfuse:
+  attribute-expiration-sec: 300
+  entry-expiration-sec: 300
+  negative-entry-expiration-sec: 10
+  allow-other: true
+  default-permission: 0755
+  direct-io: false
+  kernel-cache: true
 EOF
 
 # Secure the config file

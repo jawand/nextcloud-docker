@@ -28,7 +28,28 @@ next.prismantis.com {
         max_size 10GB
     }
 
-    # Single reverse proxy configuration for all requests
+    # Special handling for WebDAV MOVE operations (chunk assembly)
+    @webdav_move {
+        method MOVE
+        path /remote.php/dav/uploads/*
+    }
+    
+    # WebDAV MOVE operations need extra long timeouts
+    reverse_proxy @webdav_move localhost:8080 {
+        header_up X-Forwarded-Proto "https"
+        header_up Host {host}
+        header_up X-Real-IP {remote_host}
+        
+        transport http {
+            read_timeout 7200s
+            write_timeout 7200s
+            dial_timeout 60s
+            response_header_timeout 7200s
+            expect_continue_timeout 30s
+        }
+    }
+
+    # All other requests
     reverse_proxy localhost:8080 {
         # Essential headers for Nextcloud
         header_up X-Forwarded-Proto "https"

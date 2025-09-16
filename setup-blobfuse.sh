@@ -163,7 +163,7 @@ fi
 
 # Mount BlobFuse2
 echo "Executing: blobfuse2 mount /mnt/blobfuse --config-file=/opt/nextcloud/azure-config/config.yaml"
-blobfuse2 mount /mnt/blobfuse --config-file=/opt/nextcloud/azure-config/config.yaml
+blobfuse2 mount /mnt/blobfuse --config-file=/opt/nextcloud/azure-config/config.yaml --allow-other
 
 # Verify mount
 if mountpoint -q /mnt/blobfuse; then

@@ -29,6 +29,15 @@ Complete Nextcloud deployment using Docker Compose with Caddy reverse proxy and 
 5. **Restart Caddy**: `sudo systemctl restart caddy`
 6. **Access**: Visit https://your-domain.com
 
+## Important: Starting/Restarting Services
+
+**Always use the startup script for reliable operation:**
+```bash
+./start-nextcloud.sh
+```
+
+This ensures BlobFuse is mounted before Docker containers start, preventing mount issues.
+
 ## Environment Configuration
 
 Create `.env` file with the following variables:
@@ -94,6 +103,14 @@ TTL: 300
 
 **Note:** `nextcloud-entrypoint.sh` runs automatically inside the container - no manual execution needed.
 
+### Startup Script (`start-nextcloud.sh`):
+**Always use this for starting/restarting services** to prevent mount issues:
+1. Verifies BlobFuse is mounted and responding
+2. Stops existing containers
+3. Ensures proper mount order (BlobFuse first, then Docker)
+4. Starts containers and verifies mounts are working
+5. Prevents the common issue where containers can't see Azure files
+
 ## Caddy Configuration
 
 Add the configuration from `caddy-nextcloud-config.txt` to your `/etc/caddy/Caddyfile`:
@@ -121,11 +138,14 @@ Caddy will automatically obtain SSL certificates from Let's Encrypt.
 sudo ./setup-azure-blobfuse.sh          # Install BlobFuse on HOST
 ./setup.sh                              # Start Nextcloud services
 
-# Daily operations
-docker-compose up -d                    # Start services
+# Daily operations (RECOMMENDED)
+./start-nextcloud.sh                    # Start services with BlobFuse verification
 docker-compose down                     # Stop services
 docker-compose logs -f nextcloud-app    # View logs
-docker-compose pull && docker-compose up -d  # Update images
+
+# Alternative operations (use with caution)
+docker-compose restart nextcloud-app    # Quick restart (only if BlobFuse is working)
+docker-compose pull && ./start-nextcloud.sh  # Update images
 
 # BlobFuse management (HOST machine)
 sudo systemctl start blobfuse           # Mount Azure storage
@@ -177,6 +197,28 @@ sudo systemctl restart blobfuse
 # Check BlobFuse logs
 journalctl -u blobfuse -f
 ```
+
+**Container can't see Azure files (most common issue):**
+This happens when Docker containers start before BlobFuse is mounted.
+
+```bash
+# SOLUTION: Always use the startup script
+./start-nextcloud.sh
+
+# Or manually fix:
+docker-compose down
+sudo systemctl restart blobfuse
+mountpoint /mnt/blobfuse  # Verify mount
+docker-compose up -d
+
+# Verify both see same files:
+ls -la /mnt/blobfuse/                    # Host view
+docker exec nextcloud-app ls -la /mnt/azure-blob/  # Container view
+```
+
+**Folder creation errors:**
+- Usually caused by container mount issues (use solution above)
+- Check external storage configuration: `docker exec nextcloud-app php /var/www/html/occ files_external:list`
 
 **File upload errors:**
 - Check Caddy configuration includes the updated config from `caddy-nextcloud-config.txt`

@@ -47,7 +47,7 @@ services:
     image: nextcloud:30.0-apache
     container_name: nextcloud-app
     restart: unless-stopped
-    user: "0:0"  # Run as root to access BlobFuse mount
+    user: "0:0" # Run as root to access BlobFuse mount
     deploy:
       resources:
         limits:
@@ -86,10 +86,15 @@ services:
     networks:
       - nextcloud-network
     healthcheck:
-      test: ["CMD-SHELL", "test -d /mnt/azure-blob || exit 1"]
+      test:
+        [
+          "CMD-SHELL",
+          "test -d /mnt/azure-blob && ls /mnt/azure-blob > /dev/null || exit 1",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
+      start_period: 60s
 
   # Cron job service for background tasks
   nextcloud-cron:
@@ -120,7 +125,6 @@ services:
       - nextcloud-redis
     networks:
       - nextcloud-network
-
 
 networks:
   nextcloud-network:

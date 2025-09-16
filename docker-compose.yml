@@ -9,10 +9,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1024M
+          memory: 1536M
         reservations:
-          memory: 768M
-    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW --innodb-buffer-pool-size=512M --innodb-log-file-size=128M --innodb-flush-method=O_DIRECT --query-cache-size=64M --tmp-table-size=128M --max-heap-table-size=128M
+          memory: 1024M
+    command: --transaction-isolation=READ-COMMITTED --binlog-format=ROW --innodb-buffer-pool-size=1024M --innodb-log-file-size=256M --innodb-flush-method=O_DIRECT --query-cache-size=128M --tmp-table-size=256M --max-heap-table-size=256M
     volumes:
       - nextcloud_db_data:/var/lib/mysql
     environment:
@@ -33,10 +33,10 @@ services:
     deploy:
       resources:
         limits:
-          memory: 256M
+          memory: 512M
         reservations:
-          memory: 192M
-    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 192mb --maxmemory-policy allkeys-lru --save 300 10
+          memory: 384M
+    command: redis-server --requirepass ${REDIS_PASSWORD} --maxmemory 384mb --maxmemory-policy allkeys-lru --save 300 10
     volumes:
       - nextcloud_redis_data:/data
     networks:
@@ -51,9 +51,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1536M
+          memory: 2560M
         reservations:
-          memory: 1024M
+          memory: 2048M
     ports:
       - "8080:80" # Expose on port 8080 for Caddy to proxy
     volumes:
@@ -77,9 +77,9 @@ services:
       - OVERWRITEHOST=${NEXTCLOUD_DOMAIN}
       - APACHE_DISABLE_REWRITE_IP=1
       - TRUSTED_PROXIES=172.16.0.0/12 192.168.0.0/16 10.0.0.0/8 127.0.0.1
-      - PHP_MEMORY_LIMIT=1024M
-      - PHP_UPLOAD_LIMIT=1G
-      - APACHE_BODY_LIMIT=1073741824
+      - PHP_MEMORY_LIMIT=2048M
+      - PHP_UPLOAD_LIMIT=10G
+      - APACHE_BODY_LIMIT=10737418240
     depends_on:
       - nextcloud-db
       - nextcloud-redis
@@ -104,9 +104,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 512M
+          memory: 768M
         reservations:
-          memory: 256M
+          memory: 512M
     volumes:
       - nextcloud_app_data:/var/www/html
       - nextcloud_data:/var/www/html/data

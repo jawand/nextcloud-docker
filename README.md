@@ -85,8 +85,14 @@ TTL: 300
 
 ### Nextcloud Setup (`setup.sh`):
 1. Starts Nextcloud services with optimized 2GB RAM configuration
-2. Automatically detects Azure Blob mount and configures external storage
+2. Uses custom entrypoint (`nextcloud-entrypoint.sh`) that automatically:
+   - Starts Nextcloud web server
+   - Detects Azure Blob mount at `/mnt/azure-blob`
+   - Enables External Storage app
+   - Configures Azure Blob Storage for user files
 3. Sets up database, Redis cache, and cron services
+
+**Note:** `nextcloud-entrypoint.sh` runs automatically inside the container - no manual execution needed.
 
 ## Caddy Configuration
 

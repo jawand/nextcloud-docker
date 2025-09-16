@@ -93,20 +93,26 @@ chmod 700 /mnt/blobfusetmp
 echo "📝 Creating BlobFuse2 configuration..."
 cat > /opt/nextcloud/azure-config/config.yaml << EOF
 # BlobFuse2 Configuration for Nextcloud
-account-name: $AZURE_STORAGE_ACCOUNT
-account-key: $AZURE_STORAGE_KEY
-container-name: $AZURE_CONTAINER_NAME
 
-# Logging
-log-level: log_warning
-log-file-path: /var/log/blobfuse2.log
+# Azure Storage configuration
+azstorage:
+  type: block
+  account-name: $AZURE_STORAGE_ACCOUNT
+  account-key: $AZURE_STORAGE_KEY
+  container: $AZURE_CONTAINER_NAME
+  mode: key
+
+# Logging configuration
+logging:
+  type: syslog
+  level: log_warning
 
 # File cache configuration for better performance
 file_cache:
   path: /mnt/blobfusetmp
   timeout-sec: 120
 
-# Stream configuration
+# Stream configuration for memory usage
 stream:
   block-size-mb: 16
   max-buffers: 16

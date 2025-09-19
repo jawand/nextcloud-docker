@@ -94,6 +94,14 @@ echo "📝 Creating BlobFuse2 configuration..."
 cat > /opt/nextcloud/azure-config/config.yaml << EOF
 # BlobFuse2 Configuration for Nextcloud
 
+allow-other: true # make sure to edit /etc/fuse.conf to allow other users.
+
+components:
+  - libfuse
+  - file_cache
+  - attr_cache
+  - azstorage
+
 # Azure Storage configuration
 azstorage:
   type: block
@@ -101,6 +109,7 @@ azstorage:
   account-key: $AZURE_STORAGE_KEY
   container: $AZURE_CONTAINER_NAME
   mode: key
+  virtual-directory: true
 
 # Logging configuration
 logging:
@@ -111,24 +120,20 @@ logging:
 file_cache:
   path: /mnt/blobfusetmp
   timeout-sec: 300
-  max-size-mb: 0      # unlimited cache size
+  max-size-mb: 307200      # unlimited cache size
 
 # Stream configuration for memory usage
 stream:
-  block-size-mb: 64
-  max-buffers: 32
-  buffer-size-mb: 64
+  block-size-mb: 16
+  max-buffers: 8
+  buffer-size-mb: 256
 
 # Performance optimizations for large files (ALL NEW)
 libfuse:
   attribute-expiration-sec: 300
   entry-expiration-sec: 300
   negative-entry-expiration-sec: 10
-  allow-other: true
   default-permission: 0755
-  direct-io: false
-  kernel-cache: true
-  max-size-mb: 0      # 0 = unlimited cache size
 EOF
 
 # Secure the config file

@@ -233,3 +233,52 @@ docker exec nextcloud-app ls -la /mnt/azure-blob/  # Container view
 - Port 8080 in use: `netstat -tuln | grep 8080`
 - DNS not propagated: `nslookup your-domain.com`
 - Caddy config errors: `sudo caddy validate --config /etc/caddy/Caddyfile`
+
+**Add data disk to azure vm**
+Step 1: Add a temporary disk to your Azure VM
+
+- Go to the Azure Portal → Your VM → Disks
+
+- Click “+ Add data disk”
+
+- Choose Create disk
+
+- Pick a size suitable for your largest expected uploads (e.g., 100–200 GB)
+
+- Choose Standard SSD or Premium SSD depending on budget/performance
+
+- Attach the disk and save changes.
+
+Step 2: Prepare the disk in Linux (Use this when temp disk is too low to use a blobfuse tmp storage, which causes issues with large uploads, bigger than temp storage.)
+
+- SSH into your VM.
+
+- Identify the new disk:
+
+`lsblk`
+
+
+- You should see something like /dev/sdc (size matches what you added).
+
+- Create a filesystem (ext4 recommended):
+
+`sudo mkfs.ext4 /dev/sdc`
+
+
+- Mount it to a directory for BlobFuse cache:
+
+`sudo mkdir -p /mnt/blobfusetmp`
+`sudo mount /dev/sdc /mnt/blobfusetmp`
+
+
+- Make it permanent by editing /etc/fstab:
+
+`echo '/dev/sdc /mnt/blobfusetmp ext4 defaults,nofail 0 2' | sudo tee -a /etc/fstab`
+
+
+Verify:
+
+`df -h /mnt/blobfusetmp`
+
+
+Should show your new disk size (e.g., 100 GB).
